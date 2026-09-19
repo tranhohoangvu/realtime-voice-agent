@@ -158,31 +158,43 @@ Open your browser at **[http://localhost:8000](http://localhost:8000)** and clic
 
 ```
 realtime-voice-agent/
-├── server/
-│   ├── main.py                     # FastAPI WebSocket entry point
-│   ├── config.py                   # Pydantic Settings
-│   ├── core/
-│   │   ├── pipeline.py             # VoicePipeline orchestrator (VAD -> STT -> LLM -> TTS)
-│   │   ├── state_machine.py        # Conversational state manager & Barge-in
-│   │   └── chunker.py              # Clause/Sentence streaming chunker
-│   ├── modules/
-│   │   ├── vad/silero_vad.py       # Silero VAD v5 ONNX runtime wrapper
-│   │   ├── stt/faster_whisper_stt.py # Faster-Whisper local STT wrapper
+├── README.md                   # Project documentation, architecture & quickstart
+├── requirements.txt            # Python dependencies
+├── .env.example                # Configuration template for API keys & model options
+├── .gitignore                  # Git ignore rules (.env, .venv, *.onnx, PLAN.md...)
+│
+├── server/                     # Backend Voice Engine (FastAPI)
+│   ├── main.py                 # FastAPI application & WebSocket entry point (/ws/voice)
+│   ├── config.py               # Pydantic Settings & environment loader
+│   │
+│   ├── core/                   # Real-time orchestration engine
+│   │   ├── pipeline.py         # VoicePipeline: connects VAD -> STT -> LLM -> TTS
+│   │   ├── state_machine.py    # Conversational state manager (IDLE, LISTENING, THINKING, SPEAKING, INTERRUPTED)
+│   │   └── chunker.py          # ClauseChunker: segments streaming LLM tokens on punctuation for TTS
+│   │
+│   ├── modules/                # Pluggable AI Model Providers
+│   │   ├── vad/
+│   │   │   └── silero_vad.py   # Silero VAD v5 ONNX runtime wrapper (<5ms inference)
+│   │   ├── stt/
+│   │   │   └── faster_whisper_stt.py # Faster-Whisper local CPU transcription (int8)
 │   │   ├── llm/
-│   │   │   ├── groq_llm.py         # Groq streaming client
-│   │   │   └── gemini_llm.py       # Gemini Flash streaming client
-│   │   └── tts/edge_tts_client.py  # Edge-TTS streaming client
-│   └── telemetry/
-│       └── latency_tracker.py      # Granular latency breakdown tracker
+│   │   │   ├── groq_llm.py     # Groq ultra-low latency streaming client (qwen/qwen3.8-27b)
+│   │   │   └── gemini_llm.py   # Google Gemini Flash streaming client (gemini-3.6-flash)
+│   │   └── tts/
+│   │       └── edge_tts_client.py # Edge-TTS streaming synthesis (Microsoft Azure Neural)
+│   │
+│   └── telemetry/              # Real-time metrics & profiling
+│       └── latency_tracker.py  # Profiles STT duration, LLM TTFT, TTS TTFA, and Total TTFAB
 │
-├── client/
-│   ├── index.html                  # Interactive Web UI & Voice Orb
+├── client/                     # Web Client (Vanilla JS + Web Audio API)
+│   ├── index.html              # UI with Voice Orb visualizer, telemetry cards & conversation log
 │   └── src/
-│       └── app.js                  # Web Audio resampling & playback queue
+│       └── app.js              # Hardware downsampler (48k->16k), WebSocket client & playback queue
 │
-├── PLAN.md                         # Detailed project roadmap & technical plan
-├── requirements.txt                # Python dependencies
-└── .env.example                    # Environment variable template
+└── benchmarks/                 # Automated benchmarking & evaluation suite (Roadmap Milestone 5)
+    ├── benchmark_latency.py    # Automated TTFAB measurement using synthetic audio signals
+    ├── test_barge_in.py        # Interruption latency benchmark
+    └── report_generator.py     # Latency breakdown chart & report generator
 ```
 
 ---
