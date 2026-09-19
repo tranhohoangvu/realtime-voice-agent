@@ -23,5 +23,6 @@ dist/
 # IDE & OS
 .vscode/
 .idea/
-.DS_Store
-Thumbs.db
+# Project Planning & Internal Notes
+PLAN.md
+
