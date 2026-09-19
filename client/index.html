@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime Voice AI Agent (Full-Duplex)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0b0f17;
+            --surface: #131b2e;
+            --surface-border: #1f2a44;
+            --text-main: #f1f5f9;
+            --text-muted: #8e9cb3;
+            --primary: #3b82f6;
+            --idle: #64748b;
+            --listening: #10b981;
+            --thinking: #f59e0b;
+            --speaking: #06b6d4;
+            --interrupted: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            background-image: radial-gradient(circle at 50% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 60%);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 36px;
+            border-bottom: 1px solid var(--surface-border);
+            backdrop-filter: blur(10px);
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .logo-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .badge-bar {
+            display: flex;
+            gap: 8px;
+        }
+
+        .tech-pill {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+        }
+
+        main {
+            flex: 1;
+            max-width: 1100px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 36px 20px;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 28px;
+        }
+
+        @media (max-width: 860px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .orb-panel {
+            background: var(--surface);
+            border: 1px solid var(--surface-border);
+            border-radius: 24px;
+            padding: 40px 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .orb-stage {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .orb {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: var(--idle);
+            box-shadow: 0 0 35px var(--idle);
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            z-index: 2;
+        }
+
+        .orb.LISTENING {
+            background: var(--listening);
+            box-shadow: 0 0 45px var(--listening);
+            transform: scale(1.1);
+        }
+
+        .orb.THINKING {
+            background: var(--thinking);
+            box-shadow: 0 0 45px var(--thinking);
+            animation: pulse-thinking 1.2s infinite ease-in-out;
+        }
+
+        .orb.SPEAKING {
+            background: var(--speaking);
+            box-shadow: 0 0 55px var(--speaking);
+            animation: pulse-speaking 0.8s infinite alternate;
+        }
+
+        .orb.INTERRUPTED {
+            background: var(--interrupted);
+            box-shadow: 0 0 55px var(--interrupted);
+            transform: scale(0.95);
+        }
+
+        @keyframes pulse-thinking {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.15); opacity: 1; }
+        }
+
+        @keyframes pulse-speaking {
+            0% { transform: scale(1.05); }
+            100% { transform: scale(1.22); }
+        }
+
+        .state-label {
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 24px;
+            transition: color 0.3s;
+        }
+
+        .btn-call {
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            color: #fff;
+            border: none;
+            padding: 14px 36px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            border-radius: 50px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s ease;
+            box-shadow: 0 10px 25px rgba(37, 99, 235, 0.4);
+        }
+
+        .btn-call:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 30px rgba(37, 99, 235, 0.6);
+        }
+
+        .btn-call.active {
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+            box-shadow: 0 10px 25px rgba(220, 38, 38, 0.4);
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--surface-border);
+            border-radius: 20px;
+            padding: 20px;
+        }
+
+        .panel-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #38bdf8;
+        }
+
+        .metric-title {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .transcript-box {
+            height: 320px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-right: 6px;
+        }
+
+        .transcript-box::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .transcript-box::-webkit-scrollbar-thumb {
+            background: var(--surface-border);
+            border-radius: 4px;
+        }
+
+        .message {
+            padding: 10px 14px;
+            border-radius: 14px;
+            font-size: 0.88rem;
+            line-height: 1.4;
+            max-width: 90%;
+        }
+
+        .message.user {
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            align-self: flex-end;
+            color: #bfdbfe;
+        }
+
+        .message.assistant {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            align-self: flex-start;
+            color: #e2e8f0;
+        }
+
+        .bargein-tip {
+            font-size: 0.78rem;
+            color: #94a3b8;
+            text-align: center;
+            margin-top: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-area">
+            <div class="logo-icon">🎙️</div>
+            <div>
+                <div class="logo-title">Realtime Voice Agent</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Full-Duplex Speech-to-Speech</div>
+            </div>
+        </div>
+        <div class="badge-bar">
+            <span class="tech-pill">Silero VAD v5</span>
+            <span class="tech-pill">Faster-Whisper</span>
+            <span class="tech-pill">Groq / Gemini</span>
+            <span class="tech-pill">Edge-TTS</span>
+        </div>
+    </header>
+
+    <main>
+        <div class="orb-panel">
+            <div class="orb-stage">
+                <div id="orb" class="orb IDLE"></div>
+            </div>
+            <div id="state-label" class="state-label" style="color: var(--idle);">IDLE</div>
+            <button id="btn-call" class="btn-call" onclick="toggleCall()">
+                <span id="btn-icon">▶</span>
+                <span id="btn-text">Start Talking</span>
+            </button>
+            <div class="bargein-tip">
+                ⚡ <strong>Barge-in:</strong> Bạn có thể ngắt lời bất cứ lúc nào khi bot đang nói!
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="panel">
+                <div class="panel-title">
+                    <span>Performance Metrics</span>
+                    <span style="font-size: 0.7rem; color: #10b981;">Target &lt; 500ms</span>
+                </div>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div id="metric-ttfab" class="metric-value">--</div>
+                        <div class="metric-title">TTFAB (ms)</div>
+                    </div>
+                    <div class="metric-card">
+                        <div id="metric-stt" class="metric-value">--</div>
+                        <div class="metric-title">STT Latency</div>
+                    </div>
+                    <div class="metric-card">
+                        <div id="metric-llm" class="metric-value">--</div>
+                        <div class="metric-title">LLM TTFT</div>
+                    </div>
+                    <div class="metric-card">
+                        <div id="metric-tts" class="metric-value">--</div>
+                        <div class="metric-title">TTS TTFA</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="panel-title">Conversation Log</div>
+                <div id="transcript-box" class="transcript-box">
+                    <div class="message assistant">Xin chào! Nhấn "Start Talking" và nói chuyện với tôi nhé.</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/src/app.js?v=3"></script>
+    <script>
+        const client = new VoiceClient();
+        const orb = document.getElementById('orb');
+        const stateLabel = document.getElementById('state-label');
+        const btnCall = document.getElementById('btn-call');
+        const btnText = document.getElementById('btn-text');
+        const btnIcon = document.getElementById('btn-icon');
+        const transcriptBox = document.getElementById('transcript-box');
+
+        const colors = {
+            'IDLE': 'var(--idle)',
+            'CONNECTED': 'var(--idle)',
+            'LISTENING': 'var(--listening)',
+            'THINKING': 'var(--thinking)',
+            'SPEAKING': 'var(--speaking)',
+            'INTERRUPTED': 'var(--interrupted)'
+        };
+
+        client.onStateChange = (state) => {
+            orb.className = 'orb ' + state;
+            stateLabel.innerText = state;
+            stateLabel.style.color = colors[state] || 'var(--idle)';
+        };
+
+        client.onVisualizer = (volume) => {
+            if (client.isRecording) {
+                // Subtle pulse scale with voice volume
+                const scale = 1.0 + Math.min(volume * 5.0, 0.4);
+                orb.style.transform = `scale(${scale})`;
+            }
+        };
+
+        let currentAssistantMessage = null;
+
+        client.onTranscript = (role, text) => {
+            if (role === 'user') {
+                const msg = document.createElement('div');
+                msg.className = 'message user';
+                msg.innerText = text;
+                transcriptBox.appendChild(msg);
+                currentAssistantMessage = null;
+            } else if (role === 'assistant_clause') {
+                if (!currentAssistantMessage) {
+                    currentAssistantMessage = document.createElement('div');
+                    currentAssistantMessage.className = 'message assistant';
+                    transcriptBox.appendChild(currentAssistantMessage);
+                }
+                currentAssistantMessage.innerText += (currentAssistantMessage.innerText ? ' ' : '') + text;
+            }
+            transcriptBox.scrollTop = transcriptBox.scrollHeight;
+        };
+
+        client.onMetrics = (metrics) => {
+            if (metrics.total_ttfab_ms) document.getElementById('metric-ttfab').innerText = metrics.total_ttfab_ms;
+            if (metrics.stt_duration_ms) document.getElementById('metric-stt').innerText = metrics.stt_duration_ms;
+            if (metrics.llm_ttft_ms) document.getElementById('metric-llm').innerText = metrics.llm_ttft_ms;
+            if (metrics.tts_ttfa_ms) document.getElementById('metric-tts').innerText = metrics.tts_ttfa_ms;
+        };
+
+        async function toggleCall() {
+            if (!client.isRecording) {
+                try {
+                    await client.startRecording();
+                    btnCall.classList.add('active');
+                    btnText.innerText = 'End Conversation';
+                    btnIcon.innerText = '⏹';
+                } catch (e) {
+                    alert('Lỗi truy cập Micro: ' + e.message);
+                }
+            } else {
+                client.stopRecording();
+                btnCall.classList.remove('active');
+                btnText.innerText = 'Start Talking';
+                btnIcon.innerText = '▶';
+                orb.className = 'orb IDLE';
+                stateLabel.innerText = 'IDLE';
+                stateLabel.style.color = 'var(--idle)';
+            }
+        }
+    </script>
+</body>
+</html>
