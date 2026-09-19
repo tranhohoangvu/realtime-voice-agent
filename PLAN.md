@@ -123,34 +123,34 @@ realtime-voice-agent/
 ## 5. Lộ Trình Triển Khai (Phased Roadmap)
 
 ### 🔹 Giai đoạn 1: Minimal Streaming Pipeline (Tuần 1)
-- [ ] Thiết lập môi trường Python, cài đặt `faster-whisper`, `groq`, `silero-vad` và `fastapi`.
-- [ ] Xây dựng WebSocket server nhận audio stream thô (PCM 16-bit 16kHz) từ client.
-- [ ] Tích hợp Silero VAD để phát hiện khi nào người dùng bắt đầu nói và kết thúc câu nói.
-- [ ] Kết nối tuần tự: Audio End -> STT -> LLM Streaming -> TTS audio chunk trả về client.
-- [ ] Đo đạc baseline latency lần đầu.
+- [x] Thiết lập môi trường Python, cài đặt `faster-whisper`, `groq`, `silero-vad` và `fastapi`.
+- [x] Xây dựng WebSocket server nhận audio stream thô (PCM 16-bit 16kHz) từ client.
+- [x] Tích hợp Silero VAD + Hybrid Energy VAD để phát hiện khi nào người dùng bắt đầu nói và kết thúc câu nói.
+- [x] Kết nối tuần tự: Audio End -> STT -> LLM Streaming -> TTS audio chunk trả về client.
+- [x] Đo đạc baseline latency lần đầu (LatencyTracker).
 
 ### 🔹 Giai đoạn 2: Sentence Chunker & TTS Streaming (Tuần 2)
-- [ ] Viết `Sentence/Clause Chunker`: Thay vì chờ LLM sinh xong cả câu dài mới gửi qua TTS, gom token theo cụm dấu câu (`,`, `.`, `?`, `!`) để đẩy ngay sang TTS.
-- [ ] Tích hợp Kokoro-82M ONNX / Edge-TTS hoặc Cartesia để stream audio bytes ngay lập tức.
-- [ ] Client xây dựng `AudioPlayer` với hàng đợi (queue) để phát âm thanh liền mạch, không giật tiếng giữa các chunks.
+- [x] Viết `Sentence/Clause Chunker`: Thay vì chờ LLM sinh xong cả câu dài mới gửi qua TTS, gom token theo cụm dấu câu (`,`, `.`, `?`, `!`) để đẩy ngay sang TTS.
+- [x] Tích hợp Edge-TTS streaming audio bytes ngay lập tức (không cần API key, hỗ trợ giọng EN & VI).
+- [x] Client xây dựng `AudioPlayer` với hàng đợi (queue) để phát âm thanh liền mạch, không giật tiếng giữa các chunks.
 
 ### 🔹 Giai đoạn 3: State Machine & Barge-in (Ngắt lời tức thì) (Tuần 3)
-- [ ] Xây dựng `ConversationStateMachine` với các trạng thái: `LISTENING`, `THINKING`, `SPEAKING`, `INTERRUPTED`.
-- [ ] Khi bot đang ở trạng thái `SPEAKING`: Nếu Silero VAD kích hoạt tín hiệu tiếng nói người dùng:
+- [x] Xây dựng `ConversationStateMachine` với các trạng thái: `IDLE`, `LISTENING`, `THINKING`, `SPEAKING`, `INTERRUPTED`.
+- [x] Khi bot đang ở trạng thái `SPEAKING`: Nếu VAD kích hoạt tín hiệu tiếng nói người dùng:
   1. Gửi ngay cờ `INTERRUPT` về Client để dừng ngay lập tức Audio Context đang phát.
   2. Cancel `asyncio.Task` của LLM generator và TTS synthesis đang chạy nền.
-  3. Reset audio buffer và chuyển trạng thái về `LISTENING`.
+  3. Reset audio buffer, tăng generation_id để loại bỏ chunk trễ và chuyển trạng thái về `LISTENING`.
 
 ### 🔹 Giai đoạn 4: Web UI, Telemetry & Benchmark Evals (Tuần 4)
-- [ ] Xây dựng Web Audio Visualizer (hiển thị sóng âm 2 chiều của User và Bot).
-- [ ] Viết module `LatencyTracker`: Lưu log và tính toán:
-  - VAD Delay (ms)
+- [x] Xây dựng Web Audio Visualizer (Voice Orb hiển thị trạng thái và nhấp nháy theo âm lượng micro).
+- [x] Tích hợp bộ Downsampler 16kHz trên client chuyển đổi mọi tần số phần cứng (44.1k/48k) chuẩn hóa sang 16kHz.
+- [x] Viết module `LatencyTracker`: Lưu log và tính toán chi tiết:
   - STT Processing Time (ms)
   - LLM Time-to-First-Token (ms)
   - TTS Time-to-First-Audio (ms)
   - Total TTFAB (ms)
-- [ ] Viết script giả lập tự động phát audio test file và đo đạc biểu đồ phân rã độ trễ.
-- [ ] Đóng gói Docker Compose, viết README chi tiết để trình bày trong CV / GitHub.
+- [ ] Viết script giả lập tự động phát audio test file và đo đạc biểu đồ phân rã độ trễ (`benchmarks/`).
+- [ ] Đóng gói Docker Compose.
 
 ---
 
